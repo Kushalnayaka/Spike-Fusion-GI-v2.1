@@ -1,0 +1,15 @@
+# Upstream README claims versus inspected source
+
+Source reviewed from the public repository on September 25, 2026: [README.md](https://github.com/Kushalnayaka/Spike-Fusion-GI-v2.1#readme), [`models/spikefusion.py`](https://github.com/Kushalnayaka/Spike-Fusion-GI-v2.1/blob/main/models/spikefusion.py), and [`train.py`](https://github.com/Kushalnayaka/Spike-Fusion-GI-v2.1/blob/main/train.py).
+
+| README statement | Evidence in inspected source | What this implementation does |
+| --- | --- | --- |
+| 10-channel retinal encoder, four-step LIF, ECA-CNN, lightweight fusion, bidirectional Mamba | The top-level `SpikeFusion` class imports and constructs these branch classes, passes 10 retinal channels and four SNN steps by default, calls each branch, and returns auxiliary feature tensors. Imported module internals were not independently verified in this source review. | Supplies an explicit fixed 10-channel filter bank, surrogate-gradient LIF, MobileNet-style depthwise blocks with ECA, gated fusion, and a native-PyTorch bidirectional selective recurrence. |
+| Approximately 0.9M parameters | The top-level file describes 0.9M as a target and includes a runtime counter; that statement is not a measured result in itself. | Uses a 128-wide, three-block default at 314,738 parameters; the convolutional edge profile has 298,100. Smoke code recomputes both counts and enforces the 1.10M ceiling. |
+| SWA and early stopping | `train.py` instantiates an averaged model and updates it in the final epochs. It evaluates the SWA model on validation data, then separately loads the best validation checkpoint for a single post-training test evaluation. In the visible code, the SWA weights are not used as the saved best checkpoint. | Selects/saves the best checkpoint by validation macro-F1 and keeps test evaluation in a separate command. |
+| Expected 94–97% accuracy and high AUC | The README explicitly calls these expected ranges and says exact results vary; the README figures are estimates, not measured results. | Treats 95–97% as an experiment target only. This workspace includes no performance results because training was not run. |
+| Grad-CAM and working SpikeCAM | The README names XAI modules, but their internals were outside the source files verified here. | Implements gradient-based maps from the CNN and LIF feature branches and includes a no-dataset SpikeCAM smoke check. |
+
+The source audit is intentionally limited to the README and the two linked Python files; the referenced branch, data, metrics, and XAI modules may provide additional behavior not established by this review.
+
+The new optional additions are independent of that upstream audit: SHAP uses a blurred-image masker and Partition SHAP; transfer learning fine-tunes an ImageNet MobileNetV3-Small feature extractor as a teacher and distills into the small student; `micro` narrows both visual branches and replaces the recurrence with one 48-dimensional convolutional mixer. They have not been run here because the available Python runtime lacks PyTorch and the dataset.
